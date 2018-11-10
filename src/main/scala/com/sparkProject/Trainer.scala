@@ -2,12 +2,11 @@ package com.sparkProject
 
 import org.apache.spark.SparkConf
 import org.apache.spark.ml.classification.LogisticRegression
-import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, RegressionEvaluator,MulticlassClassificationEvaluator}
+import org.apache.spark.ml.evaluation.{MulticlassClassificationEvaluator}
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.ml.feature.{CountVectorizer, CountVectorizerModel, IDF, IDFModel, OneHotEncoder, RegexTokenizer, StopWordsRemover, StringIndexer, VectorAssembler}
-import org.apache.spark.ml.{Pipeline, PipelineModel}
-import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder, TrainValidationSplit}
-import org.apache.spark.mllib.evaluation.BinaryClassificationMetrics
+import org.apache.spark.ml.feature.{CountVectorizer, IDF, OneHotEncoder, RegexTokenizer, StopWordsRemover, StringIndexer, VectorAssembler}
+import org.apache.spark.ml.{Pipeline}
+import org.apache.spark.ml.tuning.{ParamGridBuilder, TrainValidationSplit}
 
 object Trainer {
 
@@ -140,6 +139,10 @@ object Trainer {
       .count.show()
 
     val f1Score = f1Evaluator.evaluate(df_WithPredictions)
+    println("F1 score is " + f1Score)
+
+    model_opt.save("/home/margaux/Documents/Cours/Intro_Hadoop/guided_project/TP_ParisTech_2017_2018_starter/model/")
+
   }
 }
 
