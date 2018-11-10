@@ -101,8 +101,8 @@ object Trainer {
       .setFeaturesCol("features")
       .setLabelCol("final_status")
       .setStandardization(true)
-      .setPredictionCol("predictions")
-      .setRawPredictionCol("raw_predictions")
+      .setPredictionCol("prediction")
+      .setRawPredictionCol("raw_prediction")
       .setThresholds(Array(0.7, 0.3))
       .setTol(1.0e-6)
       .setMaxIter(300)
@@ -111,27 +111,35 @@ object Trainer {
       .setStages(Array(tokenizer, remover, cvModel, idf, country_indexer,
         currency_indexer, country_encoder, currency_encoder, assembler, lr))
 
-    val model = pipeline.fit(data)
-    val new_df = model.transform(data)
-    new_df.select("raw_predictions").show(10)
-
     // Split the data into training and test sets (10% held out for testing)
     val Array(training, test) = data.randomSplit(Array(0.9, 0.1))
 
     // Préparer la grid search
 
     val paramGrid = new ParamGridBuilder()
-      .addGrid(cvModel.minDF, (55 to 95 by 20).toArray)
-      .addGrid(lr.regParam, Array(10e-8, 10e-6, 10e-4, 10ce-2))
+      .addGrid(cvModel.minDF, (55.0 to 95.0 by 20).toArray)
+      .addGrid(lr.regParam, Array(10e-8, 10e-6, 10e-4, 10e-2))
       .build()
 
+    val f1Evaluator = new MulticlassClassificationEvaluator()
+      .setLabelCol("final_status")
+      .setMetricName("f1")
+
     val trainValidationSplit = new TrainValidationSplit()
-      .setEstimator(lr)
-      .setEvaluator(new MulticlassClassificationEvaluator().setMetricName("f1"))
+      .setEstimator(pipeline)
+      .setEvaluator(f1Evaluator)
       .setEstimatorParamMaps(paramGrid)
       // 70% of the data will be used for training and the remaining 20% for validation.
       .setTrainRatio(0.7)
 
+    val model_opt = trainValidationSplit.fit(training)
+
+
+    val df_WithPredictions = model_opt.transform(test)
+    df_WithPredictions.groupBy("final_status", "prediction")
+      .count.show()
+
+    val f1Score = f1Evaluator.evaluate(df_WithPredictions)
   }
 }
 
