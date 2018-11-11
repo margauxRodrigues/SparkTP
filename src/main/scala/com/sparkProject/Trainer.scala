@@ -40,7 +40,6 @@ object Trainer {
       *
       * *******************************************************************************/
 
-    println("hello world ! from Trainer")
     // lire le fichier parquet
     val data = spark.read.parquet("/home/margaux/Documents/Cours/Intro_Hadoop/guided_project/TP_ParisTech_2017_2018_starter/prepared_trainingset")
 
@@ -95,14 +94,14 @@ object Trainer {
 
     // Stage 10 : logistic regression
     val lr = new LogisticRegression()
-      .setElasticNetParam(0.0)
+      .setElasticNetParam(0.2)
       .setFitIntercept(true)
       .setFeaturesCol("features")
       .setLabelCol("final_status")
       .setStandardization(true)
       .setPredictionCol("prediction")
       .setRawPredictionCol("raw_prediction")
-      .setThresholds(Array(0.7, 0.3))
+      .setThreshold(0.55)
       .setTol(1.0e-6)
       .setMaxIter(300)
 
@@ -111,13 +110,14 @@ object Trainer {
         currency_indexer, country_encoder, currency_encoder, assembler, lr))
 
     // Split the data into training and test sets (10% held out for testing)
-    val Array(training, test) = data.randomSplit(Array(0.9, 0.1))
+    val Array(training, test) = data.randomSplit(Array(0.9, 0.1), seed = 2)
 
     // Préparer la grid search
 
     val paramGrid = new ParamGridBuilder()
       .addGrid(cvModel.minDF, (55.0 to 95.0 by 20).toArray)
       .addGrid(lr.regParam, Array(10e-8, 10e-6, 10e-4, 10e-2))
+      //.addGrid(lr.elasticNetParam, (0.1 to 0.9 by 0.1).toArray)
       .build()
 
     val f1Evaluator = new MulticlassClassificationEvaluator()
@@ -128,20 +128,30 @@ object Trainer {
       .setEstimator(pipeline)
       .setEvaluator(f1Evaluator)
       .setEstimatorParamMaps(paramGrid)
-      // 70% of the data will be used for training and the remaining 20% for validation.
+      .setSeed(2)
+      // 70% of the data will be used for training and the remaining 30% for validation.
       .setTrainRatio(0.7)
 
     val model_opt = trainValidationSplit.fit(training)
 
 
+    println("training")
+    training.groupBy("final_status")
+      .count().show()
+
+    println("test")
+    test.groupBy("final_status")
+      .count().show()
+
     val df_WithPredictions = model_opt.transform(test)
     df_WithPredictions.groupBy("final_status", "prediction")
       .count.show()
 
+
     val f1Score = f1Evaluator.evaluate(df_WithPredictions)
     println("F1 score is " + f1Score)
 
-    model_opt.save("/home/margaux/Documents/Cours/Intro_Hadoop/guided_project/TP_ParisTech_2017_2018_starter/model/")
+    model_opt.write.overwrite().save("/home/margaux/Documents/Cours/Intro_Hadoop/guided_project/TP_ParisTech_2017_2018_starter/model/")
 
   }
 }
