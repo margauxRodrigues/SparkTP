@@ -59,8 +59,6 @@ object Trainer {
     val cvModel = new CountVectorizer()
       .setInputCol("filtered")
       .setOutputCol("tf")
-      .setVocabSize(3)
-      .setMinDF(2)
 
     // Stage 4 : IDF
     val idf = new IDF()
@@ -71,11 +69,13 @@ object Trainer {
     val country_indexer = new StringIndexer()
       .setInputCol("country2")
       .setOutputCol("country_indexed")
+      .setHandleInvalid("skip") // pour éviter les erreurs de compilation
 
     // Stage 6 : convertir currency en index
     val currency_indexer = new StringIndexer()
       .setInputCol("currency2")
       .setOutputCol("currency_indexed")
+      .setHandleInvalid("skip") // pour éviter les erreurs de compilation
 
     // Stage 7 et 8 : onehotencoder
     val country_encoder = new OneHotEncoder()
@@ -94,14 +94,14 @@ object Trainer {
 
     // Stage 10 : logistic regression
     val lr = new LogisticRegression()
-      .setElasticNetParam(0.2)
+      .setElasticNetParam(0.0)
       .setFitIntercept(true)
       .setFeaturesCol("features")
       .setLabelCol("final_status")
       .setStandardization(true)
-      .setPredictionCol("prediction")
-      .setRawPredictionCol("raw_prediction")
-      .setThreshold(0.55)
+      .setPredictionCol("predictions")
+      .setRawPredictionCol("raw_predictions")
+      //.setThreshold(0.55)
       .setTol(1.0e-6)
       .setMaxIter(300)
 
@@ -115,13 +115,14 @@ object Trainer {
     // Préparer la grid search
 
     val paramGrid = new ParamGridBuilder()
-      .addGrid(cvModel.minDF, (55.0 to 95.0 by 20).toArray)
+      .addGrid(cvModel.minDF, (55.0 to 95.0 by 20.0).toArray)
       .addGrid(lr.regParam, Array(10e-8, 10e-6, 10e-4, 10e-2))
       //.addGrid(lr.elasticNetParam, (0.1 to 0.9 by 0.1).toArray)
       .build()
 
     val f1Evaluator = new MulticlassClassificationEvaluator()
       .setLabelCol("final_status")
+      .setPredictionCol("predictions")
       .setMetricName("f1")
 
     val trainValidationSplit = new TrainValidationSplit()
@@ -131,6 +132,7 @@ object Trainer {
       .setSeed(2)
       // 70% of the data will be used for training and the remaining 30% for validation.
       .setTrainRatio(0.7)
+
 
     val model_opt = trainValidationSplit.fit(training)
 
@@ -144,7 +146,7 @@ object Trainer {
       .count().show()
 
     val df_WithPredictions = model_opt.transform(test)
-    df_WithPredictions.groupBy("final_status", "prediction")
+    df_WithPredictions.groupBy("final_status", "predictions")
       .count.show()
 
 
